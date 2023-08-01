@@ -22,7 +22,7 @@ fn parse(lines: Lines<BufReader<File>>) -> Result<Ini> {
     let mut sess_name = Some(String::from(""));
     let mut sess = Some(Session::default());
 
-    for line in lines {
+    for (i, line) in lines.enumerate() {
         let line = line?;
         match parse_line(line) {
             ParseLineResult::NewSession { name } => {
@@ -36,7 +36,9 @@ fn parse(lines: Lines<BufReader<File>>) -> Result<Ini> {
                     sess.insert(key, value);
                 }
             }
-            ParseLineResult::InvalidFormat => return Err("parse error".into()),
+            ParseLineResult::ParseError { error } => {
+                return Err(format!("parse error, line {}, {}", i + 1, error).into())
+            }
         }
     }
     ini.insert(sess_name.take().unwrap(), sess.take().unwrap());
@@ -89,7 +91,11 @@ fn parse_line(line: String) -> ParseLineResult {
                             qoute = None;
                         }
                         ';' | '#' => break,
-                        '\'' | '"' => return ParseLineResult::InvalidFormat,
+                        '\'' | '"' => {
+                            return ParseLineResult::ParseError {
+                                error: "invalid qoute position".into(),
+                            }
+                        }
                         _ => part.push(ch),
                     }
                 }
@@ -120,7 +126,9 @@ fn parse_line(line: String) -> ParseLineResult {
     }
 
     if qoute.is_some() {
-        return ParseLineResult::InvalidFormat;
+        return ParseLineResult::ParseError {
+            error: "unclosed qoute".into(),
+        };
     }
 
     parts.push(part.trim().to_string());
@@ -134,12 +142,16 @@ fn parse_line(line: String) -> ParseLineResult {
                 let name = part[1..part.len() - 1].to_string();
                 ParseLineResult::NewSession { name }
             } else {
-                ParseLineResult::InvalidFormat
+                ParseLineResult::ParseError {
+                    error: "invalid session name format".into(),
+                }
             }
         }
         3 => {
             if parts[1] != "=" {
-                ParseLineResult::InvalidFormat
+                ParseLineResult::ParseError {
+                    error: "invalid assignment".into(),
+                }
             } else {
                 ParseLineResult::KeyValue {
                     key: parts[0].clone(),
@@ -150,7 +162,9 @@ fn parse_line(line: String) -> ParseLineResult {
         _ => {
             for part in parts {
                 if part.len() > 0 {
-                    return ParseLineResult::InvalidFormat;
+                    return ParseLineResult::ParseError {
+                        error: "extra key or value found ".into(),
+                    };
                 }
             }
             ParseLineResult::EmptyLine
@@ -162,5 +176,5 @@ enum ParseLineResult {
     NewSession { name: String },
     EmptyLine,
     KeyValue { key: String, value: String },
-    InvalidFormat,
+    ParseError { error: String },
 }
