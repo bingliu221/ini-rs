@@ -1,23 +1,22 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{self, BufRead, BufReader, Lines},
+    io::{BufRead, BufReader, Lines},
     path::Path,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub type Session = HashMap<String, String>;
-
 pub type Ini = HashMap<String, Session>;
 
 pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Ini> {
     let file = File::open(path)?;
-    let lines = io::BufReader::new(file).lines();
-    parse(lines)
+    let lines = BufReader::new(file).lines();
+    parse_lines(lines)
 }
 
-fn parse(lines: Lines<BufReader<File>>) -> Result<Ini> {
+fn parse_lines(lines: Lines<BufReader<File>>) -> Result<Ini> {
     let mut ini = Ini::default();
     let mut sess_name = Some(String::from(""));
     let mut sess = Some(Session::default());
@@ -63,9 +62,7 @@ fn parse_line(line: String) -> ParseLineResult {
                     started = true;
                     continue;
                 }
-                _ => {
-                    started = true;
-                }
+                _ => started = true,
             }
         }
 
@@ -137,9 +134,9 @@ fn parse_line(line: String) -> ParseLineResult {
 
     match parts.len() {
         1 => {
-            let part = &parts[0];
-            if part.starts_with("[") && part.ends_with("]") {
-                let name = part[1..part.len() - 1].to_string();
+            let part = parts[0];
+            if only_starts_with(part, "[") && only_ends_with(part, "]") {
+                let name = part[1..part.len() - 1].trim().to_string();
                 ParseLineResult::NewSession { name }
             } else {
                 ParseLineResult::ParseError {
@@ -177,4 +174,12 @@ enum ParseLineResult {
     EmptyLine,
     KeyValue { key: String, value: String },
     ParseError { error: String },
+}
+
+fn only_starts_with(s: &str, pat: &str) -> bool {
+    s.starts_with(pat) && !s[pat.len()..].contains(pat)
+}
+
+fn only_ends_with(s: &str, pat: &str) -> bool {
+    s.ends_with(pat) && !s[..s.len() - pat.len()].contains(pat)
 }
