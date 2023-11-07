@@ -130,31 +130,35 @@ fn parse_line(line: String) -> ParseLineResult {
 
     parts.push(part.trim().to_string());
 
-    let parts: Vec<_> = parts.iter().filter(|part| part.len() > 0).collect();
-
     match parts.len() {
         1 => {
-            let part = parts[0];
+            let part = &parts[0];
+            if part == "" {
+                return ParseLineResult::EmptyLine;
+            }
             if only_starts_with(part, "[") && only_ends_with(part, "]") {
                 let name = part[1..part.len() - 1].trim().to_string();
-                ParseLineResult::NewSession { name }
-            } else {
-                ParseLineResult::ParseError {
-                    error: "invalid session name format".into(),
-                }
+                return ParseLineResult::NewSession { name };
             }
+            return ParseLineResult::ParseError {
+                error: "invalid session name format".into(),
+            };
         }
         3 => {
-            if parts[1] != "=" {
-                ParseLineResult::ParseError {
-                    error: "invalid assignment".into(),
-                }
-            } else {
-                ParseLineResult::KeyValue {
-                    key: parts[0].clone(),
-                    value: parts[2].clone(),
-                }
+            if &parts[0] == "" {
+                return ParseLineResult::ParseError {
+                    error: "empty key".into(),
+                };
             }
+            if parts[1] != "=" {
+                return ParseLineResult::ParseError {
+                    error: "invalid assignment".into(),
+                };
+            }
+            return ParseLineResult::KeyValue {
+                key: parts[0].clone(),
+                value: parts[2].clone(),
+            };
         }
         _ => {
             for part in parts {
@@ -164,9 +168,9 @@ fn parse_line(line: String) -> ParseLineResult {
                     };
                 }
             }
-            ParseLineResult::EmptyLine
+            return ParseLineResult::EmptyLine;
         }
-    }
+    };
 }
 
 enum ParseLineResult {
